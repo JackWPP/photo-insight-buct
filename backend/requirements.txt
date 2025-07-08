@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-socketio
+SQLAlchemy
+# For AI and Vector DB
+torch
+transformers
+Pillow
+chromadb
