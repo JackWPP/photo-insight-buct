@@ -68,3 +68,40 @@ def create_image_record(db: Session, path: str):
 def get_all_images(db: Session):
     """获取所有已索引的图片"""
     return db.query(models.Image).all()
+
+def add_photo_to_season(db: Session, image_id: int, season_model):
+    """将照片添加进指定的季节表"""
+    # 检查是否已存在
+    existing_entry = db.query(season_model).filter(season_model.image_id == image_id).first()
+    if existing_entry:
+        return existing_entry
+    
+    db_season_photo = season_model(image_id=image_id)
+    db.add(db_season_photo)
+    db.commit()
+    db.refresh(db_season_photo)
+    return db_season_photo
+
+def add_photo_to_spring(db: Session, image_id: int):
+    return add_photo_to_season(db, image_id, models.SpringPhoto)
+
+def add_photo_to_summer(db: Session, image_id: int):
+    return add_photo_to_season(db, image_id, models.SummerPhoto)
+
+def add_photo_to_autumn(db: Session, image_id: int):
+    return add_photo_to_season(db, image_id, models.AutumnPhoto)
+
+def add_photo_to_winter(db: Session, image_id: int):
+    return add_photo_to_season(db, image_id, models.WinterPhoto)
+
+def get_spring_photos(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Image).join(models.SpringPhoto).offset(skip).limit(limit).all()
+
+def get_summer_photos(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Image).join(models.SummerPhoto).offset(skip).limit(limit).all()
+
+def get_autumn_photos(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Image).join(models.AutumnPhoto).offset(skip).limit(limit).all()
+
+def get_winter_photos(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Image).join(models.WinterPhoto).offset(skip).limit(limit).all()

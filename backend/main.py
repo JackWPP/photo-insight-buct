@@ -8,7 +8,8 @@ import logging
 from sqlalchemy.orm import Session
 
 # 导入数据库和模型相关的模块
-from backend import crud, models, database, clip_model, vector_db
+from . import crud, models, database, clip_model, vector_db
+from .classify_seasons import classification_task
 
 # 在应用启动时创建数据库表
 models.Base.metadata.create_all(bind=database.engine)
@@ -53,7 +54,7 @@ async def start_indexing(sid, data):
     directory = data.get('directory')
     if not directory or not os.path.isdir(directory):
         logging.error(f"无效的目录: {directory}")
-        await sio.emit('error', {'data': '无效的目录或目录不存在'}, room=sid)
+        await sio.emit('error', {'data': '无效的目录或目录不存���'}, room=sid)
         return
 
     logging.info(f"开始扫描目录: {directory}")
@@ -115,6 +116,48 @@ async def load_all_images(sid, data):
     except Exception as e:
         logging.error(f"加载图片时发生错误: {e}")
         await sio.emit('error', {'data': f'加载图片出错: {str(e)}'}, room=sid)
+    finally:
+        db.close()
+
+@sio.on('start_season_classification')
+async def start_season_classification(sid, data):
+    """从前端启动季节分类任务"""
+    logging.info(f"收到来自 {sid} 的季节分类请求")
+    # 在后台运行分类任务，避免阻塞服务器
+    sio.start_background_task(classification_task, sio=sio, sid=sid)
+
+@sio.on('load_season_images')
+async def load_season_images(sid, data):
+    """根据季节加载图片"""
+    season = data.get('season')
+    if not season:
+        await sio.emit('error', {'data': '未提供季节参数'}, room=sid)
+        return
+
+    logging.info(f"收到加载 {season} 图片的请求")
+    db = database.SessionLocal()
+    try:
+        season_map = {
+            "Spring": crud.get_spring_photos,
+            "Summer": crud.get_summer_photos,
+            "Autumn": crud.get_autumn_photos,
+            "Winter": crud.get_winter_photos,
+        }
+        
+        if season not in season_map:
+            await sio.emit('error', {'data': f'无效的季节: {season}'}, room=sid)
+            return
+
+        # limit=500 是一个临时的保护措施，防止一次加载过多图片
+        images = season_map[season](db, limit=500)
+        images_data = [{'path': image.path} for image in images]
+        
+        await sio.emit('season_images_loaded', {'images': images_data, 'season': season}, room=sid)
+        logging.info(f"已发送 {len(images_data)} 张 {season} 的图片到客户端")
+
+    except Exception as e:
+        logging.error(f"加载 {season} 图片时发生错误: {e}")
+        await sio.emit('error', {'data': f'加载 {season} 图片出错: {str(e)}'}, room=sid)
     finally:
         db.close()
 

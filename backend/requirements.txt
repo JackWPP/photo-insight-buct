@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 python-socketio
 SQLAlchemy
+openai
 # For AI and Vector DB
 torch
 transformers
